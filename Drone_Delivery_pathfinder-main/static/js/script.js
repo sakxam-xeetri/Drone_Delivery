@@ -2,107 +2,6 @@ let currentMode = '.'; // default to open
 let grid = [];
 let map = null;
 
-// Sound Effects using Web Audio API
-const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-const SOUNDS = {
-    beep: () => playBeep(800, 0.1),
-    click: () => playBeep(600, 0.05),
-    launch: () => playDroneStart(),
-    flying: () => playDroneFly(),
-    success: () => playSuccess()
-};
-
-function playBeep(frequency, duration) {
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = frequency;
-    oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + duration);
-}
-
-function playDroneStart() {
-    // Drone startup sound - rising pitch
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.type = 'sawtooth';
-    oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 1);
-    
-    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 1);
-}
-
-let flyingSoundInterval = null;
-
-function playDroneFly() {
-    // Continuous drone propeller sound
-    if (flyingSoundInterval) clearInterval(flyingSoundInterval);
-    
-    flyingSoundInterval = setInterval(() => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.type = 'sawtooth';
-        oscillator.frequency.value = 150 + Math.random() * 50;
-        
-        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.3);
-    }, 200);
-}
-
-function stopDroneFly() {
-    if (flyingSoundInterval) {
-        clearInterval(flyingSoundInterval);
-        flyingSoundInterval = null;
-    }
-}
-
-function playSuccess() {
-    // Success melody
-    const notes = [523, 659, 784, 1047]; // C, E, G, C (major chord)
-    notes.forEach((freq, i) => {
-        setTimeout(() => {
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = freq;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.5);
-        }, i * 150);
-    });
-}
-
 // Initialize Map
 function initMap() {
     if (map) {
@@ -139,7 +38,6 @@ function changeMapLocation() {
     
     if (map) {
         map.setView([lat, lng], 13);
-        SOUNDS.beep();
     }
 }
 
@@ -217,8 +115,6 @@ function createGrid() {
         initMap();
     }
     
-    SOUNDS.beep();
-
     for (let r = 0; r < rows; r++) {
         const row = [];
         for (let c = 0; c < cols; c++) {
@@ -269,16 +165,12 @@ function toggleCell(cell) {
     // Add SVG icons
     if (nextState === 'S') {
         cell.innerHTML = SVG_ICONS.drone;
-        SOUNDS.beep();
     } else if (nextState === 'G') {
         cell.innerHTML = SVG_ICONS.flag;
-        SOUNDS.beep();
     } else if (nextState === 'X') {
         cell.innerHTML = SVG_ICONS.building;
-        SOUNDS.click();
     } else {
         cell.innerHTML = '';
-        SOUNDS.click();
     }
 
     updateGridStructureView();
@@ -410,42 +302,10 @@ function highlightPath(path) {
         }
     });
 
-    // Start animated countdown
+    // Start drone movement after path highlighting
     setTimeout(() => {
-        showCountdown(path);
+        moveDrone(path);
     }, path.length * 150 + 500);
-}
-
-
-function showCountdown(path) {
-    const countdownScreen = document.getElementById('countdown-screen');
-    const countText = document.getElementById('count-text');
-
-    countdownScreen.style.display = 'flex';
-
-    let count = 3;
-
-    const interval = setInterval(() => {
-        if (count > 0) {
-            countText.textContent = count;
-            countText.classList.remove('count-text');
-            void countText.offsetWidth; // restart animation
-            countText.classList.add('count-text');
-            SOUNDS.beep(); // Beep on each count
-            count--;
-        } else if (count === 0) {
-            countText.textContent = 'GO!';
-            countText.classList.remove('count-text');
-            void countText.offsetWidth;
-            countText.classList.add('count-text');
-            SOUNDS.launch(); // Launch sound
-            count--;
-        } else {
-            clearInterval(interval);
-            countdownScreen.style.display = 'none';
-            moveDrone(path);
-        }
-    }, 1000); // 1 second per count
 }
 
 function moveDrone(path) {
@@ -464,15 +324,11 @@ function moveDrone(path) {
     drone.style.left = (rect.left + rect.width/2 - 50) + 'px';
     drone.style.top = (rect.top + rect.height/2 - 50) + 'px';
 
-    // Start flying sound
-    SOUNDS.flying();
-
     let step = 1;
 
     const interval = setInterval(() => {
         if (step >= path.length) {
             clearInterval(interval);
-            stopDroneFly();
             showDeliveryComplete();
             return;
         }
@@ -490,36 +346,15 @@ function moveDrone(path) {
 }
 
 function showDeliveryComplete() {
-    // Success sound
-    SOUNDS.success();
-    
-    // Launch confetti
-    confetti({
-        particleCount: 200,
-        spread: 100,
-        origin: { y: 0.6 },
-        colors: ['#00d4ff', '#00ff88', '#ffcc00', '#ff6b35']
-    });
-    
-    // Create modal
-    const modal = document.createElement('div');
-    modal.className = 'delivery-modal';
-    modal.innerHTML = `
-        <svg viewBox="0 0 100 100" width="80" height="80" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="#00ff88" stroke-width="3"/>
-            <path d="M30 50 L45 65 L75 35" fill="none" stroke="#00ff88" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-                <animate attributeName="stroke-dasharray" from="0 100" to="100 0" dur="0.5s" fill="freeze"/>
-            </path>
-        </svg>
-        <h2>MISSION COMPLETE</h2>
-        <p>Package delivered successfully!</p>
-    `;
-    document.body.appendChild(modal);
-    
+    const batteryItem = document.querySelector('.status-item:nth-child(3) span:last-child');
+    if (batteryItem) batteryItem.textContent = 'MISSION: COMPLETED';
+
+    const statusText = document.querySelector('.status-item:nth-child(4) span:last-child');
+    if (statusText) statusText.textContent = 'STATUS: SUCCESS';
+
     setTimeout(() => {
-        modal.remove();
         clearAfterDelivery();
-    }, 5000);
+    }, 1200);
 }
 
 // Resets all grid items and set to "." white 
@@ -604,4 +439,3 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-
